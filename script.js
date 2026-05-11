@@ -3,7 +3,19 @@ let player;
 let ROOM_ID = "";
 let lastTime = 0;
 let currentVideoId = '6JoCNbsPg4k'; 
-let isSyncing = false; // NEW: Prevents feedback loops
+let isSyncing = false; 
+
+// Notification Throttling
+let lastToastTime = 0;
+function showToast(msg) {
+    const now = Date.now();
+    if (now - lastToastTime < 3000) return; // Only show once every 3 seconds
+    const toast = document.getElementById('toast');
+    toast.innerText = msg;
+    toast.classList.add('show');
+    lastToastTime = now;
+    setTimeout(() => toast.classList.remove('show'), 2500);
+}
 
 function createNewRoom() {
     const name = document.getElementById('user-name').value.trim();
@@ -39,7 +51,7 @@ firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
 function onYouTubeIframeAPIReady() {
     player = new YT.Player('player', {
         height: '100%', width: '100%', videoId: currentVideoId,
-        playerVars: { 'rel': 0, 'modestbranding': 1 },
+        playerVars: { 'rel': 0, 'modestbranding': 1, 'autoplay': 1 },
         events: { 'onStateChange': onPlayerStateChange, 'onReady': onPlayerReady }
     });
 }
@@ -56,8 +68,7 @@ function onPlayerReady() {
 }
 
 function onPlayerStateChange(event) {
-    if (isSyncing) return; // Ignore events triggered by server sync [cite: 22]
-
+    if (isSyncing) return;
     const time = player.getCurrentTime();
     if (event.data == YT.PlayerState.PLAYING) socket.emit('play_video', { roomId: ROOM_ID, time });
     if (event.data == YT.PlayerState.PAUSED) socket.emit('pause_video', { roomId: ROOM_ID, time });
@@ -73,7 +84,7 @@ socket.on('room_data', (data) => {
         isSyncing = true;
         currentVideoId = data.videoId;
         player.loadVideoById(currentVideoId, data.currentTime || 0);
-        setTimeout(() => { isSyncing = false; }, 1000); // Re-enable events after load
+        setTimeout(() => isSyncing = false, 1200);
     }
 
     data.participants.forEach(p => {
@@ -81,21 +92,20 @@ socket.on('room_data', (data) => {
         card.className = 'user-card';
         const roleClass = p.role === 'Host' ? 'role-host' : (p.role === 'Moderator' ? 'role-mod' : '');
         let controls = (isHost && p.id !== socket.id) ? `
-            <div style="margin-top:8px; display:flex; gap:5px;">
-                <button style="background:#22c55e; color:white; font-size:10px; padding:4px;" onclick="promote('${p.id}')">Mod</button>
-                <button style="background:#ef4444; color:white; font-size:10px; padding:4px;" onclick="kick('${p.id}')">Kick</button>
+            <div style="margin-top:10px; display:flex; gap:8px;">
+                <button style="padding:5px 10px; font-size:11px; background:#10b981;" onclick="promote('${p.id}')">Promote</button>
+                <button style="padding:5px 10px; font-size:11px; background:#ef4444;" onclick="kick('${p.id}')">Kick</button>
             </div>` : '';
         card.innerHTML = `<div style="display:flex; justify-content:space-between; align-items:center;">
-            <span>${p.username}</span><span class="role-badge ${roleClass}">${p.role}</span>
+            <span style="font-weight:500;">${p.username}</span><span class="role-badge ${roleClass}">${p.role}</span>
         </div> ${controls}`;
         listDiv.appendChild(card);
     });
 });
 
 socket.on('sync_action', (data) => {
-    isSyncing = true; // Lock events while syncing [cite: 7, 22]
+    isSyncing = true;
     const localTime = player.getCurrentTime();
-    
     if (data.action === 'play') { 
         if (Math.abs(localTime - data.time) > 2) player.seekTo(data.time); 
         player.playVideo(); 
@@ -104,8 +114,11 @@ socket.on('sync_action', (data) => {
     } else if (data.action === 'seek') { 
         player.seekTo(data.time); 
     }
+    setTimeout(() => isSyncing = false, 1000);
+});
 
-    setTimeout(() => { isSyncing = false; }, 800); // Re-enable after sync
+socket.on('permission_denied', () => {
+    showToast("Access Denied: Only Hosts can control playback.");
 });
 
 socket.on('video_changed', (data) => {
@@ -113,19 +126,15 @@ socket.on('video_changed', (data) => {
         isSyncing = true;
         currentVideoId = data.videoId;
         player.loadVideoById(currentVideoId);
-        setTimeout(() => { isSyncing = false; }, 1000);
+        setTimeout(() => isSyncing = false, 1200);
     }
 });
 
-// Removed the alert() that was disrupting the flow 
-socket.on('permission_denied', () => { console.warn("Permission denied by server."); });
-socket.on('kicked', () => { window.location.href = "/"; });
-
 function promote(id) { socket.emit('assign_role', { roomId: ROOM_ID, targetUserId: id, role: 'Moderator' }); }
-function kick(id) { if(confirm("Kick user?")) socket.emit('remove_participant', { roomId: ROOM_ID, targetUserId: id }); }
+function kick(id) { if(confirm("Remove this user from the room?")) socket.emit('remove_participant', { roomId: ROOM_ID, targetUserId: id }); }
 
 document.getElementById('change-video-btn').onclick = () => {
     const url = document.getElementById('video-url').value.trim();
     const match = url.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/);
     if (match && match[1]) socket.emit('change_video', { roomId: ROOM_ID, videoId: match[1] });
-};
+};s
