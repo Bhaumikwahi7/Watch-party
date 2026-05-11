@@ -7,13 +7,11 @@ const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*" } });
 
 app.use(express.static(__dirname));
-
 const rooms = new Map();
 
 io.on('connection', (socket) => {
     socket.on('join_room', ({ roomId, username }) => {
         socket.join(roomId);
-        
         if (!rooms.has(roomId)) {
             rooms.set(roomId, { 
                 hostId: socket.id, 
@@ -22,21 +20,23 @@ io.on('connection', (socket) => {
                 participants: [] 
             });
         }
-        
         const room = rooms.get(roomId);
         const role = (socket.id === room.hostId) ? 'Host' : 'Participant';
-        
-        // Prevent duplicate entries
-        room.participants = room.participants.filter(p => p.id !== socket.id);
         room.participants.push({ id: socket.id, username, role });
-
-        console.log(`[STUDIO] ${username} joined room ${roomId} as ${role}`);
 
         io.to(roomId).emit('room_data', { 
             participants: room.participants, 
             videoId: room.currentVideoId,
             currentTime: room.currentTime
         });
+        
+        // System message for joining
+        io.to(roomId).emit('new_message', { username: 'System', message: `${username} joined the party!` });
+    });
+
+    // Chat logic
+    socket.on('send_chat', (data) => {
+        io.to(data.roomId).emit('new_message', { username: data.username, message: data.message });
     });
 
     const checkPrivilege = (roomId) => {
@@ -77,17 +77,16 @@ io.on('connection', (socket) => {
 
     socket.on('disconnect', () => {
         rooms.forEach((room, roomId) => {
+            const user = room.participants.find(p => p.id === socket.id);
+            if (user) {
+                io.to(roomId).emit('new_message', { username: 'System', message: `${user.username} left.` });
+            }
             room.participants = room.participants.filter(p => p.id !== socket.id);
             if (room.participants.length > 0) {
-                if (room.hostId === socket.id) {
-                    room.hostId = room.participants[0].id;
-                    room.participants[0].role = 'Host';
-                }
                 io.to(roomId).emit('room_data', { participants: room.participants, videoId: room.currentVideoId });
             } else { rooms.delete(roomId); }
         });
     });
 });
 
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`>>> SYNCSTREAM STUDIO RUNNING ON PORT ${PORT}`));
+server.listen(process.env.PORT || 3000, () => console.log("Studio Ready"));
