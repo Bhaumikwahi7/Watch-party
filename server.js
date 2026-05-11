@@ -15,7 +15,7 @@ io.on('connection', (socket) => {
         if (!rooms.has(roomId)) {
             rooms.set(roomId, { 
                 hostId: socket.id, 
-                currentVideoId: 'https://youtu.be/Ru4lEmhHTF4?si=mnZ4wV0kAYNfcqCU',
+                currentVideoId: 'Ru4lEmhHTF4',
                 currentTime: 0,
                 participants: [] 
             });
