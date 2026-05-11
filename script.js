@@ -2,10 +2,10 @@ const socket = io();
 let player;
 let ROOM_ID = "";
 let lastTime = 0;
-let currentVideoId = 'Ru4lEmhHTF4'; // Default set to Zero Trailer
+let currentVideoId = 'Ru4lEmhHTF4'; // Default: Zero Trailer
 let remoteAction = false; 
 
-// Toast logic
+// Professional Toast Notification
 let lastToastTime = 0;
 function showToast(msg) {
     const now = Date.now();
@@ -17,7 +17,8 @@ function showToast(msg) {
     setTimeout(() => toast.classList.remove('show'), 2500);
 }
 
-function initYouTube() {
+// Crucial: Only load YouTube when officially in the room
+function enterRoom() {
     var tag = document.createElement('script'); 
     tag.src = "https://www.youtube.com/iframe_api";
     var firstScriptTag = document.getElementsByTagName('script')[0];
@@ -26,7 +27,7 @@ function initYouTube() {
 
 function createNewRoom() {
     const name = document.getElementById('user-name').value.trim();
-    if (!name) return alert("Please enter your name");
+    if (!name) return alert("Enter Name");
     const newID = Math.random().toString(36).substring(2, 8).toUpperCase();
     window.location.search = `?room=${newID}&user=${encodeURIComponent(name)}`;
 }
@@ -34,7 +35,7 @@ function createNewRoom() {
 function joinExistingRoom() {
     const name = document.getElementById('user-name').value.trim();
     const room = document.getElementById('room-input').value.trim().toUpperCase();
-    if (!name || !room) return alert("Name and Room ID required");
+    if (!name || !room) return alert("Name & Room Code required");
     window.location.search = `?room=${room}&user=${encodeURIComponent(name)}`;
 }
 
@@ -48,8 +49,8 @@ window.onload = () => {
         document.getElementById('landing-page').style.display = 'none';
         document.getElementById('room-display').innerText = `ID: ${ROOM_ID}`;
         
-        // Start YouTube player ONLY after entering the room (ensures audio works)
-        initYouTube();
+        // Load YouTube logic only now to prevent "Ghost Voice"
+        enterRoom();
         socket.emit('join_room', { roomId: ROOM_ID, username: userFromUrl });
     }
 };
@@ -63,9 +64,7 @@ function onYouTubeIframeAPIReady() {
 }
 
 function onPlayerReady(event) {
-    // Force play to trigger audio after user interaction
     event.target.playVideo();
-    
     setInterval(() => {
         if (!player || typeof player.getCurrentTime !== 'function' || remoteAction) return;
         const currentTime = player.getCurrentTime();
@@ -120,7 +119,7 @@ socket.on('room_data', (data) => {
     });
 });
 
-socket.on('permission_denied', () => showToast("Restricted: Only Hosts/Mods can control sync."));
+socket.on('permission_denied', () => showToast("Host/Moderator only!"));
 
 document.getElementById('change-video-btn').onclick = () => {
     const url = document.getElementById('video-url').value.trim();
