@@ -3,15 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SyncStream | Pro Cinematic</title>
+    <title>SyncStream | Studio Edition</title>
     <script src="/socket.io/socket.io.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;800&display=swap" rel="stylesheet">
     <style>
         :root {
             --bg: #020617;
-            --surface: rgba(15, 23, 42, 0.8);
+            --surface: rgba(15, 23, 42, 0.85);
             --accent: #38bdf8;
-            --glow: rgba(56, 189, 248, 0.4);
+            --glow: rgba(56, 189, 248, 0.3);
             --text-main: #f8fafc;
             --text-dim: #94a3b8;
             --border: rgba(255, 255, 255, 0.08);
@@ -21,145 +21,110 @@
             font-family: 'Plus Jakarta Sans', sans-serif;
             background: radial-gradient(circle at 50% -20%, #1e1b4b, #020617);
             color: var(--text-main);
-            margin: 0;
-            display: flex;
-            height: 100vh;
-            overflow: hidden;
+            margin: 0; display: flex; height: 100vh; overflow: hidden;
         }
 
-        /* Toast Notification */
         #toast {
             position: fixed; top: 30px; right: 30px;
-            background: rgba(15, 23, 42, 0.9);
-            backdrop-filter: blur(12px);
-            border: 1px solid #ef4444;
-            color: #fca5a5; padding: 16px 28px; border-radius: 16px;
-            font-weight: 600; box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+            background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(12px);
+            border: 1px solid #ef4444; color: #fca5a5;
+            padding: 16px 28px; border-radius: 16px; font-weight: 600;
             opacity: 0; transform: translateY(-20px);
-            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-            z-index: 9999;
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1); z-index: 9999;
         }
         #toast.show { opacity: 1; transform: translateY(0); }
 
-        /* Auth Screen */
         #landing-page {
             position: fixed; inset: 0; background: var(--bg);
             display: flex; align-items: center; justify-content: center; z-index: 1000;
         }
 
         .landing-card {
-            background: var(--surface);
-            backdrop-filter: blur(24px);
-            padding: 60px; border-radius: 40px;
-            border: 1px solid var(--border);
-            width: 440px; text-align: center;
-            box-shadow: 0 0 100px rgba(0,0,0,0.8);
+            background: var(--surface); backdrop-filter: blur(24px);
+            padding: 60px; border-radius: 40px; border: 1px solid var(--border);
+            width: 440px; text-align: center; box-shadow: 0 0 100px rgba(0,0,0,0.8);
         }
 
-        /* Main Workspace */
         #sidebar {
-            width: 340px; background: var(--surface);
-            backdrop-filter: blur(16px);
+            width: 320px; background: var(--surface); backdrop-filter: blur(16px);
             padding: 40px 30px; border-right: 1px solid var(--border);
             display: flex; flex-direction: column; gap: 30px;
         }
 
         #main-content {
             flex: 1; display: flex; flex-direction: column;
-            align-items: center; justify-content: center;
-            padding: 40px; position: relative;
+            align-items: center; justify-content: center; padding: 40px;
         }
 
         .video-wrapper {
-            width: 100%; max-width: 1200px;
-            aspect-ratio: 16/9; background: #000;
-            border-radius: 32px; overflow: hidden;
-            border: 1px solid var(--border);
-            box-shadow: 0 40px 80px -20px rgba(0,0,0,0.9), 0 0 20px var(--glow);
+            width: 100%; max-width: 1100px; aspect-ratio: 16/9; background: #000;
+            border-radius: 32px; overflow: hidden; border: 1px solid var(--border);
+            box-shadow: 0 40px 80px rgba(0,0,0,0.9), 0 0 20px var(--glow);
             position: relative;
         }
 
         #player { position: absolute; inset: 0; width: 100%; height: 100%; }
 
-        /* Pro Controls */
         .control-bar {
-            width: 100%; max-width: 1200px; margin-top: 40px;
-            display: flex; gap: 16px; padding: 12px;
-            background: rgba(255,255,255,0.03);
-            border-radius: 24px; border: 1px solid var(--border);
+            width: 100%; max-width: 1100px; margin-top: 30px;
+            display: flex; gap: 12px; padding: 12px;
+            background: rgba(255,255,255,0.03); border-radius: 24px; border: 1px solid var(--border);
         }
 
         input {
             background: rgba(0,0,0,0.3); border: 1px solid var(--border);
-            color: white; padding: 16px 24px; border-radius: 18px;
-            flex: 1; outline: none; font-size: 15px; transition: 0.3s;
+            color: white; padding: 16px 24px; border-radius: 18px; flex: 1; outline: none;
         }
-        input:focus { border-color: var(--accent); background: rgba(0,0,0,0.5); }
 
         .btn-primary {
             background: var(--accent); color: #020617; border: none;
             padding: 16px 32px; border-radius: 18px; font-weight: 800;
-            cursor: pointer; transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            text-transform: uppercase; letter-spacing: 1px;
+            cursor: pointer; transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
-        .btn-primary:hover { transform: scale(1.05); box-shadow: 0 0 25px var(--glow); }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 10px 20px var(--glow); }
 
         .user-pill {
-            background: rgba(255,255,255,0.05); padding: 16px;
-            border-radius: 20px; border: 1px solid var(--border);
-            margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;
+            background: rgba(255,255,255,0.05); padding: 16px; border-radius: 20px;
+            border: 1px solid var(--border); margin-bottom: 12px;
+            display: flex; justify-content: space-between; align-items: center;
         }
 
-        .badge {
-            font-size: 10px; padding: 4px 12px; border-radius: 30px;
-            font-weight: 900; letter-spacing: 1px;
-        }
-        .badge-host { background: #fbbf24; color: #000; box-shadow: 0 0 15px rgba(251,191,36,0.3); }
-        .badge-mod { background: #a855f7; color: #fff; box-shadow: 0 0 15px rgba(168,85,247,0.3); }
+        .badge { font-size: 10px; padding: 4px 12px; border-radius: 30px; font-weight: 900; }
+        .badge-host { background: #fbbf24; color: #000; }
+        .badge-mod { background: #a855f7; color: #fff; }
     </style>
 </head>
 <body>
 
-    <div id="toast">Restricted Access</div>
+    <div id="toast">Permission Denied</div>
 
     <div id="landing-page">
         <div class="landing-card">
-            <h1 style="font-size: 3rem; margin: 0; background: linear-gradient(to right, #38bdf8, #818cf8); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">SyncStream</h1>
-            <p style="color: var(--text-dim); margin: 15px 0 40px; font-weight: 300; letter-spacing: 2px;">CINEMATIC WATCH PARTY</p>
-            
-            <input type="text" id="user-name" placeholder="Display Name" style="width: 85%; margin-bottom: 15px;">
-            <button onclick="createNewRoom()" class="btn-primary" style="width: 95%; margin-bottom: 20px;">Start New Session</button>
-            
-            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px;">
-                <div style="flex: 1; height: 1px; background: var(--border);"></div>
-                <span style="color: var(--text-dim); font-size: 12px;">OR JOIN</span>
-                <div style="flex: 1; height: 1px; background: var(--border);"></div>
-            </div>
-
-            <input type="text" id="room-input" placeholder="Room Code" style="width: 85%; margin-bottom: 15px;">
-            <button onclick="joinExistingRoom()" class="btn-primary" style="width: 95%; background: transparent; border: 1px solid var(--border); color: white;">Connect to ID</button>
+            <h1 style="font-size: 2.5rem; margin: 0; color: var(--accent);">SyncStream</h1>
+            <p style="color: var(--text-dim); margin-bottom: 40px; letter-spacing: 2px;">STUDIO EDITION</p>
+            <input type="text" id="user-name" placeholder="Name" style="width: 85%; margin-bottom: 15px;">
+            <button onclick="createNewRoom()" class="btn-primary" style="width: 95%; margin-bottom: 15px;">Create Party</button>
+            <input type="text" id="room-input" placeholder="Room ID" style="width: 85%; margin-bottom: 15px;">
+            <button onclick="joinExistingRoom()" class="btn-primary" style="width: 95%; background: transparent; border: 1px solid var(--border); color: white;">Join Room</button>
         </div>
     </div>
 
     <div id="sidebar">
         <div>
-            <h2 style="font-weight: 800; color: var(--accent);">STUDIO</h2>
-            <div id="room-display" style="color: var(--text-dim); font-size: 12px; margin-top: 5px;">ID: UNLINKED</div>
+            <h2 style="color: var(--accent);">STUDIO</h2>
+            <div id="room-display" style="color: var(--text-dim); font-size: 12px;">ID: --</div>
         </div>
-        
-        <div style="flex: 1;">
-            <h4 style="font-size: 11px; letter-spacing: 2px; color: var(--text-dim); margin-bottom: 20px;">PARTICIPANTS</h4>
+        <div>
+            <h4 style="font-size: 11px; color: var(--text-dim); margin-bottom: 20px;">MEMBERS</h4>
             <div id="user-list"></div>
         </div>
     </div>
 
     <div id="main-content">
-        <div class="video-wrapper">
-            <div id="player"></div>
-        </div>
+        <div class="video-wrapper"><div id="player"></div></div>
         <div class="control-bar">
-            <input type="text" id="video-url" placeholder="Paste YouTube link to synchronize...">
-            <button id="change-video-btn" class="btn-primary">Sync Now</button>
+            <input type="text" id="video-url" placeholder="Paste YouTube link...">
+            <button id="change-video-btn" class="btn-primary">Sync Video</button>
         </div>
     </div>
 
