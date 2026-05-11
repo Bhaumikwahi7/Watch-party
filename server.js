@@ -7,11 +7,13 @@ const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*" } });
 
 app.use(express.static(__dirname));
+
 const rooms = new Map();
 
 io.on('connection', (socket) => {
     socket.on('join_room', ({ roomId, username }) => {
         socket.join(roomId);
+        
         if (!rooms.has(roomId)) {
             rooms.set(roomId, { 
                 hostId: socket.id, 
@@ -20,11 +22,15 @@ io.on('connection', (socket) => {
                 participants: [] 
             });
         }
+        
         const room = rooms.get(roomId);
         const role = (socket.id === room.hostId) ? 'Host' : 'Participant';
+        
+        // Prevent duplicate entries
+        room.participants = room.participants.filter(p => p.id !== socket.id);
         room.participants.push({ id: socket.id, username, role });
 
-        console.log(`[SYNC] User ${username} joined room ${roomId} as ${role}`);
+        console.log(`[STUDIO] ${username} joined room ${roomId} as ${role}`);
 
         io.to(roomId).emit('room_data', { 
             participants: room.participants, 
@@ -73,6 +79,10 @@ io.on('connection', (socket) => {
         rooms.forEach((room, roomId) => {
             room.participants = room.participants.filter(p => p.id !== socket.id);
             if (room.participants.length > 0) {
+                if (room.hostId === socket.id) {
+                    room.hostId = room.participants[0].id;
+                    room.participants[0].role = 'Host';
+                }
                 io.to(roomId).emit('room_data', { participants: room.participants, videoId: room.currentVideoId });
             } else { rooms.delete(roomId); }
         });
@@ -80,4 +90,4 @@ io.on('connection', (socket) => {
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`>>> SYNCSTREAM STUDIO ACTIVE ON PORT ${PORT}`));
+server.listen(PORT, () => console.log(`>>> SYNCSTREAM STUDIO RUNNING ON PORT ${PORT}`));
