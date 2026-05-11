@@ -5,19 +5,13 @@ let lastTime = 0;
 let currentVideoId = 'Ru4lEmhHTF4'; // Default: Zero Trailer
 let remoteAction = false; 
 
-// Professional Toast Notification
-let lastToastTime = 0;
 function showToast(msg) {
-    const now = Date.now();
-    if (now - lastToastTime < 3000) return; 
     const toast = document.getElementById('toast');
     toast.innerText = msg;
     toast.classList.add('show');
-    lastToastTime = now;
-    setTimeout(() => toast.classList.remove('show'), 2500);
+    setTimeout(() => toast.classList.remove('show'), 3000);
 }
 
-// Crucial: Only load YouTube when officially in the room
 function enterRoom() {
     var tag = document.createElement('script'); 
     tag.src = "https://www.youtube.com/iframe_api";
@@ -27,7 +21,7 @@ function enterRoom() {
 
 function createNewRoom() {
     const name = document.getElementById('user-name').value.trim();
-    if (!name) return alert("Enter Name");
+    if (!name) return;
     const newID = Math.random().toString(36).substring(2, 8).toUpperCase();
     window.location.search = `?room=${newID}&user=${encodeURIComponent(name)}`;
 }
@@ -35,7 +29,7 @@ function createNewRoom() {
 function joinExistingRoom() {
     const name = document.getElementById('user-name').value.trim();
     const room = document.getElementById('room-input').value.trim().toUpperCase();
-    if (!name || !room) return alert("Name & Room Code required");
+    if (!name || !room) return;
     window.location.search = `?room=${room}&user=${encodeURIComponent(name)}`;
 }
 
@@ -48,8 +42,6 @@ window.onload = () => {
         ROOM_ID = roomFromUrl;
         document.getElementById('landing-page').style.display = 'none';
         document.getElementById('room-display').innerText = `ID: ${ROOM_ID}`;
-        
-        // Load YouTube logic only now to prevent "Ghost Voice"
         enterRoom();
         socket.emit('join_room', { roomId: ROOM_ID, username: userFromUrl });
     }
@@ -58,13 +50,16 @@ window.onload = () => {
 function onYouTubeIframeAPIReady() {
     player = new YT.Player('player', {
         height: '100%', width: '100%', videoId: currentVideoId,
-        playerVars: { 'rel': 0, 'modestbranding': 1, 'autoplay': 1, 'mute': 0 },
+        playerVars: { 'rel': 0, 'modestbranding': 1, 'autoplay': 1, 'controls': 1 },
         events: { 'onStateChange': onPlayerStateChange, 'onReady': onPlayerReady }
     });
 }
 
 function onPlayerReady(event) {
     event.target.playVideo();
+    // Attempt to unmute to bypass auto-block logic
+    event.target.unMute(); 
+    
     setInterval(() => {
         if (!player || typeof player.getCurrentTime !== 'function' || remoteAction) return;
         const currentTime = player.getCurrentTime();
@@ -110,16 +105,16 @@ socket.on('room_data', (data) => {
 
     data.participants.forEach(p => {
         const card = document.createElement('div');
-        card.className = 'user-card';
-        const roleClass = p.role === 'Host' ? 'role-host' : (p.role === 'Moderator' ? 'role-mod' : '');
-        card.innerHTML = `<div style="display:flex; justify-content:space-between; align-items:center;">
-            <span style="font-weight:600;">${p.username}</span><span class="role-badge ${roleClass}">${p.role}</span>
-        </div>`;
+        card.className = 'user-pill';
+        const roleClass = p.role === 'Host' ? 'badge-host' : (p.role === 'Moderator' ? 'badge-mod' : '');
+        card.innerHTML = `
+            <span style="font-weight:600;">${p.username}</span>
+            <span class="badge ${roleClass}">${p.role}</span>`;
         listDiv.appendChild(card);
     });
 });
 
-socket.on('permission_denied', () => showToast("Host/Moderator only!"));
+socket.on('permission_denied', () => showToast("Host/Moderator permissions required."));
 
 document.getElementById('change-video-btn').onclick = () => {
     const url = document.getElementById('video-url').value.trim();
