@@ -1,8 +1,9 @@
 const socket = io(); 
 let player;
 let ROOM_ID = "";
+let USERNAME = "";
 let lastTime = 0;
-let currentVideoId = 'Ru4lEmhHTF4'; // Default: Zero Trailer
+let currentVideoId = 'Ru4lEmhHTF4'; 
 let remoteAction = false; 
 
 function showToast(msg) {
@@ -12,7 +13,7 @@ function showToast(msg) {
     setTimeout(() => toast.classList.remove('show'), 3000);
 }
 
-function enterRoom() {
+function loadYouTubeAPI() {
     var tag = document.createElement('script'); 
     tag.src = "https://www.youtube.com/iframe_api";
     var firstScriptTag = document.getElementsByTagName('script')[0];
@@ -40,12 +41,36 @@ window.onload = () => {
     
     if (roomFromUrl && userFromUrl) {
         ROOM_ID = roomFromUrl;
+        USERNAME = userFromUrl;
         document.getElementById('landing-page').style.display = 'none';
         document.getElementById('room-display').innerText = `ID: ${ROOM_ID}`;
-        enterRoom();
-        socket.emit('join_room', { roomId: ROOM_ID, username: userFromUrl });
+        loadYouTubeAPI();
+        socket.emit('join_room', { roomId: ROOM_ID, username: USERNAME });
     }
 };
+
+// Chat Logic
+function sendChat() {
+    const input = document.getElementById('chat-input');
+    const msg = input.value.trim();
+    if (msg) {
+        socket.emit('send_chat', { roomId: ROOM_ID, username: USERNAME, message: msg });
+        input.value = "";
+    }
+}
+
+document.getElementById('chat-input')?.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') sendChat();
+});
+
+socket.on('new_message', (data) => {
+    const chatBox = document.getElementById('chat-messages');
+    const msgEl = document.createElement('div');
+    msgEl.className = 'msg';
+    msgEl.innerHTML = `<b>${data.username}:</b> ${data.message}`;
+    chatBox.appendChild(msgEl);
+    chatBox.scrollTop = chatBox.scrollHeight;
+});
 
 function onYouTubeIframeAPIReady() {
     player = new YT.Player('player', {
@@ -57,9 +82,7 @@ function onYouTubeIframeAPIReady() {
 
 function onPlayerReady(event) {
     event.target.playVideo();
-    // Attempt to unmute to bypass auto-block logic
     event.target.unMute(); 
-    
     setInterval(() => {
         if (!player || typeof player.getCurrentTime !== 'function' || remoteAction) return;
         const currentTime = player.getCurrentTime();
@@ -93,7 +116,6 @@ socket.on('sync_action', (data) => {
 socket.on('room_data', (data) => {
     const listDiv = document.getElementById('user-list');
     listDiv.innerHTML = '';
-    
     if (data.videoId !== currentVideoId) {
         remoteAction = true;
         currentVideoId = data.videoId;
@@ -102,22 +124,31 @@ socket.on('room_data', (data) => {
         }
         setTimeout(() => { remoteAction = false; }, 2000);
     }
-
     data.participants.forEach(p => {
         const card = document.createElement('div');
         card.className = 'user-pill';
         const roleClass = p.role === 'Host' ? 'badge-host' : (p.role === 'Moderator' ? 'badge-mod' : '');
-        card.innerHTML = `
-            <span style="font-weight:600;">${p.username}</span>
-            <span class="badge ${roleClass}">${p.role}</span>`;
+        card.innerHTML = `<span style="font-weight:600;">${p.username}</span><span class="badge ${roleClass}">${p.role}</span>`;
         listDiv.appendChild(card);
     });
 });
 
-socket.on('permission_denied', () => showToast("Host/Moderator permissions required."));
+socket.on('video_changed', (data) => {
+    if (data.videoId !== currentVideoId) {
+        remoteAction = true;
+        currentVideoId = data.videoId;
+        player.loadVideoById(currentVideoId);
+        setTimeout(() => { player.playVideo(); remoteAction = false; }, 1500);
+    }
+});
+
+socket.on('permission_denied', () => showToast("Restricted: Host/Mods only."));
 
 document.getElementById('change-video-btn').onclick = () => {
     const url = document.getElementById('video-url').value.trim();
     const match = url.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/);
-    if (match && match[1]) socket.emit('change_video', { roomId: ROOM_ID, videoId: match[1] });
+    if (match && match[1]) {
+        socket.emit('change_video', { roomId: ROOM_ID, videoId: match[1] });
+        document.getElementById('video-url').value = "";
+    }
 };
