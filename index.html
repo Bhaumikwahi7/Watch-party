@@ -5,18 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SyncStream | Premium Watch Party</title>
     <script src="/socket.io/socket.io.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
             --bg: #020617;
-            --card: rgba(30, 41, 59, 0.7);
+            --card: rgba(15, 23, 42, 0.7);
             --accent: #38bdf8;
             --text: #f8fafc;
-            --glass: rgba(255, 255, 255, 0.05);
             --border: rgba(255, 255, 255, 0.1);
+            --glass: rgba(255, 255, 255, 0.03);
         }
 
         body {
-            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            font-family: 'Inter', sans-serif;
             background: radial-gradient(circle at top right, #1e1b4b, #020617);
             color: var(--text);
             margin: 0;
@@ -25,23 +26,16 @@
             overflow: hidden;
         }
 
-        /* Toast Notification */
         #toast {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: #ef4444;
-            color: white;
-            padding: 12px 24px;
-            border-radius: 8px;
-            font-weight: 600;
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
-            opacity: 0;
-            transform: translateY(-20px);
+            position: fixed; top: 20px; right: 20px;
+            background: rgba(239, 68, 68, 0.9); backdrop-filter: blur(8px);
+            color: white; padding: 12px 24px; border-radius: 12px;
+            font-weight: 600; box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+            opacity: 0; transform: translateX(100px);
             transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            z-index: 1000;
+            z-index: 9999;
         }
-        #toast.show { opacity: 1; transform: translateY(0); }
+        #toast.show { opacity: 1; transform: translateX(0); }
 
         #landing-page {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
@@ -49,110 +43,74 @@
         }
 
         .landing-card {
-            background: var(--card);
-            backdrop-filter: blur(12px);
-            padding: 40px;
-            border-radius: 24px;
-            border: 1px solid var(--border);
-            width: 400px;
-            text-align: center;
-            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
+            background: var(--card); backdrop-filter: blur(20px);
+            padding: 50px; border-radius: 32px; border: 1px solid var(--border);
+            width: 400px; text-align: center; box-shadow: 0 25px 50px rgba(0,0,0,0.7);
         }
 
         #sidebar {
-            width: 320px;
-            background: rgba(15, 23, 42, 0.8);
-            backdrop-filter: blur(8px);
-            padding: 30px;
-            border-right: 1px solid var(--border);
-            display: flex;
-            flex-direction: column;
+            width: 320px; background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(10px);
+            padding: 30px; border-right: 1px solid var(--border); display: flex; flex-direction: column; gap: 20px;
         }
 
         #main { flex: 1; padding: 40px; display: flex; flex-direction: column; align-items: center; }
 
         .video-container {
-            width: 100%;
-            max-width: 1100px;
-            aspect-ratio: 16/9;
-            background: #000;
-            border-radius: 20px;
-            overflow: hidden;
-            border: 1px solid var(--border);
-            box-shadow: 0 0 40px rgba(56, 189, 248, 0.1);
-            position: relative;
+            width: 100%; max-width: 1100px; aspect-ratio: 16/9; background: #000;
+            border-radius: 24px; overflow: hidden; border: 1px solid var(--border);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.6); position: relative;
         }
 
         #player { position: absolute; top:0; left:0; width: 100%; height: 100%; }
 
         .controls {
-            width: 100%;
-            max-width: 1100px;
-            margin-top: 30px;
-            display: flex;
-            gap: 15px;
+            width: 100%; max-width: 1100px; margin-top: 30px;
+            display: flex; gap: 12px; background: var(--glass);
+            padding: 12px; border-radius: 20px; border: 1px solid var(--border);
         }
 
         input {
-            background: var(--glass);
-            border: 1px solid var(--border);
-            color: white;
-            padding: 14px 20px;
-            border-radius: 12px;
-            outline: none;
-            transition: 0.3s;
+            background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border);
+            color: white; padding: 14px 20px; border-radius: 14px; flex: 1; outline: none;
         }
-        input:focus { border-color: var(--accent); background: rgba(255,255,255,0.08); }
 
         button {
-            background: var(--accent);
-            color: #020617;
-            border: none;
-            padding: 14px 28px;
-            border-radius: 12px;
-            font-weight: 700;
-            cursor: pointer;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            background: var(--accent); color: #020617; border: none;
+            padding: 14px 28px; border-radius: 14px; font-weight: 700;
+            cursor: pointer; transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
-        button:hover { transform: translateY(-2px); filter: brightness(1.1); box-shadow: 0 10px 15px -3px rgba(56, 189, 248, 0.3); }
+        button:hover { transform: translateY(-2px); box-shadow: 0 10px 15px rgba(56, 189, 248, 0.3); }
 
         .user-card {
-            background: var(--glass);
-            padding: 15px;
-            border-radius: 14px;
-            margin-bottom: 12px;
-            border: 1px solid var(--border);
+            background: var(--glass); padding: 16px; border-radius: 16px;
+            border: 1px solid var(--border); margin-bottom: 10px;
         }
 
-        .role-badge {
-            font-size: 10px; padding: 4px 8px; border-radius: 6px;
-            text-transform: uppercase; letter-spacing: 0.5px;
-        }
+        .role-badge { font-size: 10px; padding: 4px 10px; border-radius: 8px; font-weight: 800; }
         .role-host { background: #fbbf24; color: #000; }
         .role-mod { background: #a855f7; color: #fff; }
     </style>
 </head>
 <body>
 
-    <div id="toast">Permission Denied: Only Host/Mods can control video.</div>
+    <div id="toast">Permission Denied</div>
 
     <div id="landing-page">
         <div class="landing-card">
-            <h1 style="color: var(--accent); margin-bottom: 10px;">SyncStream</h1>
-            <p style="color: #94a3b8; margin-bottom: 30px;">Cinematic Watch Party Experience</p>
-            <input type="text" id="user-name" placeholder="Your Name" style="width: 80%; margin-bottom: 15px;">
-            <button onclick="createNewRoom()" style="width: 90%; margin-bottom: 10px;">Create Party</button>
-            <div style="margin: 15px 0; color: #475569;">OR</div>
-            <input type="text" id="room-input" placeholder="Room Code" style="width: 80%; margin-bottom: 15px;">
-            <button onclick="joinExistingRoom()" style="width: 90%; background: #334155; color: white;">Join Room</button>
+            <h1 style="color: var(--accent);">SyncStream</h1>
+            <p style="color: #94a3b8; margin-bottom: 30px;">Cinematic Watch Party</p>
+            <input type="text" id="user-name" placeholder="Enter Your Name" style="width: 85%; margin-bottom: 15px;">
+            <button onclick="createNewRoom()" style="width: 95%; margin-bottom: 15px;">Create New Party</button>
+            <input type="text" id="room-input" placeholder="Room Code" style="width: 85%; margin-bottom: 15px;">
+            <button onclick="joinExistingRoom()" style="width: 95%; background: #1e293b; color: white;">Join Room</button>
         </div>
     </div>
 
     <div id="sidebar">
-        <h2 style="color: var(--accent); margin-top: 0;">SyncStream</h2>
-        <div id="room-display" style="color: #64748b; font-size: 14px;">Room: --</div>
-        <hr style="border: 0.5px solid var(--border); margin: 25px 0; width: 100%;">
-        <h4 style="margin-top: 0;">Party Members</h4>
+        <h2 style="color: var(--accent);">SyncStream</h2>
+        <div id="room-display" style="color: #64748b; font-size: 13px;">ID: --</div>
+        <hr style="border: 0.5px solid var(--border); margin: 10px 0;">
+        <h4 style="color: #94a3b8;">MEMBERS</h4>
         <div id="user-list"></div>
     </div>
 
