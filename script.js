@@ -3,13 +3,13 @@ let player;
 let ROOM_ID = "";
 let lastTime = 0;
 let currentVideoId = '6JoCNbsPg4k'; 
-let isSyncing = false; 
+let remoteAction = false; // Flag to prevent sync loops
 
-// Notification Throttling
+// Notification Throttling for the Toast
 let lastToastTime = 0;
 function showToast(msg) {
     const now = Date.now();
-    if (now - lastToastTime < 3000) return; // Only show once every 3 seconds
+    if (now - lastToastTime < 3000) return; 
     const toast = document.getElementById('toast');
     toast.innerText = msg;
     toast.classList.add('show');
@@ -58,9 +58,10 @@ function onYouTubeIframeAPIReady() {
 
 function onPlayerReady() {
     setInterval(() => {
-        if (!player || typeof player.getCurrentTime !== 'function' || isSyncing) return;
+        if (!player || typeof player.getCurrentTime !== 'function' || remoteAction) return;
         const currentTime = player.getCurrentTime();
-        if (Math.abs(currentTime - lastTime) > 2) {
+        // Only emit seek if user manually dragged the bar (difference > 2s)
+        if (Math.abs(currentTime - lastTime) > 2.5) {
             socket.emit('seek_video', { roomId: ROOM_ID, time: currentTime });
         }
         lastTime = currentTime;
@@ -68,11 +69,32 @@ function onPlayerReady() {
 }
 
 function onPlayerStateChange(event) {
-    if (isSyncing) return;
+    // If the state changed because of a server command, do nothing
+    if (remoteAction) return;
+
     const time = player.getCurrentTime();
-    if (event.data == YT.PlayerState.PLAYING) socket.emit('play_video', { roomId: ROOM_ID, time });
-    if (event.data == YT.PlayerState.PAUSED) socket.emit('pause_video', { roomId: ROOM_ID, time });
+    if (event.data == YT.PlayerState.PLAYING) {
+        socket.emit('play_video', { roomId: ROOM_ID, time: time });
+    } else if (event.data == YT.PlayerState.PAUSED) {
+        socket.emit('pause_video', { roomId: ROOM_ID, time: time });
+    }
 }
+
+socket.on('sync_action', (data) => {
+    remoteAction = true; // LOCK: Stop local events from firing
+    
+    if (data.action === 'play') {
+        player.seekTo(data.time, true);
+        player.playVideo();
+    } else if (data.action === 'pause') {
+        player.pauseVideo();
+    } else if (data.action === 'seek') {
+        player.seekTo(data.time, true);
+    }
+
+    // UNLOCK after the player has had time to update
+    setTimeout(() => { remoteAction = false; }, 1200);
+});
 
 socket.on('room_data', (data) => {
     const listDiv = document.getElementById('user-list');
@@ -80,11 +102,12 @@ socket.on('room_data', (data) => {
     const currentUser = data.participants.find(p => p.id === socket.id);
     const isHost = currentUser?.role === 'Host';
 
+    // Initial sync for new joiners
     if (data.videoId !== currentVideoId) {
-        isSyncing = true;
+        remoteAction = true;
         currentVideoId = data.videoId;
         player.loadVideoById(currentVideoId, data.currentTime || 0);
-        setTimeout(() => isSyncing = false, 1200);
+        setTimeout(() => { remoteAction = false; }, 2000);
     }
 
     data.participants.forEach(p => {
@@ -103,38 +126,31 @@ socket.on('room_data', (data) => {
     });
 });
 
-socket.on('sync_action', (data) => {
-    isSyncing = true;
-    const localTime = player.getCurrentTime();
-    if (data.action === 'play') { 
-        if (Math.abs(localTime - data.time) > 2) player.seekTo(data.time); 
-        player.playVideo(); 
-    } else if (data.action === 'pause') { 
-        player.pauseVideo(); 
-    } else if (data.action === 'seek') { 
-        player.seekTo(data.time); 
+socket.on('video_changed', (data) => {
+    if (data.videoId !== currentVideoId) {
+        remoteAction = true;
+        currentVideoId = data.videoId;
+        player.loadVideoById(currentVideoId);
+        setTimeout(() => { remoteAction = false; }, 2000);
     }
-    setTimeout(() => isSyncing = false, 1000);
 });
 
 socket.on('permission_denied', () => {
-    showToast("Access Denied: Only Hosts can control playback.");
+    showToast("Access Denied: Only Hosts/Mods can control sync.");
 });
 
-socket.on('video_changed', (data) => {
-    if (data.videoId !== currentVideoId) {
-        isSyncing = true;
-        currentVideoId = data.videoId;
-        player.loadVideoById(currentVideoId);
-        setTimeout(() => isSyncing = false, 1200);
-    }
+socket.on('kicked', () => {
+    alert("You have been removed from the room.");
+    window.location.href = "/";
 });
 
 function promote(id) { socket.emit('assign_role', { roomId: ROOM_ID, targetUserId: id, role: 'Moderator' }); }
-function kick(id) { if(confirm("Remove this user from the room?")) socket.emit('remove_participant', { roomId: ROOM_ID, targetUserId: id }); }
+function kick(id) { if(confirm("Kick this user?")) socket.emit('remove_participant', { roomId: ROOM_ID, targetUserId: id }); }
 
 document.getElementById('change-video-btn').onclick = () => {
     const url = document.getElementById('video-url').value.trim();
     const match = url.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/);
-    if (match && match[1]) socket.emit('change_video', { roomId: ROOM_ID, videoId: match[1] });
-};s
+    if (match && match[1]) {
+        socket.emit('change_video', { roomId: ROOM_ID, videoId: match[1] });
+    }
+};
