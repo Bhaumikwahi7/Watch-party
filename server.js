@@ -7,26 +7,21 @@ const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*" } });
 
 app.use(express.static(__dirname));
-
 const rooms = new Map();
 
 io.on('connection', (socket) => {
     socket.on('join_room', ({ roomId, username }) => {
         socket.join(roomId);
-        
-        // Ensure default video ID is Ru4lEmhHTF4
         if (!rooms.has(roomId)) {
             rooms.set(roomId, { 
                 hostId: socket.id, 
-                currentVideoId: 'Ru4lEmhHTF4', 
+                currentVideoId: 'Ru4lEmhHTF4', // Default Video
                 currentTime: 0,
                 participants: [] 
             });
         }
-        
         const room = rooms.get(roomId);
         const role = (socket.id === room.hostId) ? 'Host' : 'Participant';
-        
         room.participants.push({ id: socket.id, username, role });
 
         io.to(roomId).emit('room_data', { 
@@ -82,5 +77,4 @@ io.on('connection', (socket) => {
     });
 });
 
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+server.listen(process.env.PORT || 3000, () => console.log("Server Live"));
