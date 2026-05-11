@@ -2,50 +2,170 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>SyncStream | Watch Party</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SyncStream | Premium Watch Party</title>
     <script src="/socket.io/socket.io.js"></script>
     <style>
-        :root { --bg: #0f172a; --card: #1e293b; --accent: #38bdf8; --text: #f1f5f9; }
-        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; height: 100vh; overflow: hidden; }
-        #landing-page { position:fixed; top:0; left:0; width:100%; height:100%; background:var(--bg); display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:100; }
-        .landing-card { background:var(--card); padding:30px; border-radius:12px; border:1px solid #334155; width:350px; display:flex; flex-direction:column; gap:15px; }
-        #sidebar { width: 280px; background: var(--card); padding: 20px; display: flex; flex-direction: column; border-right: 1px solid #334155; }
-        #main { flex: 1; padding: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        .video-box { width: 95%; max-width: 1000px; aspect-ratio: 16/9; background: #000; border-radius: 12px; position: relative; overflow: hidden; border: 2px solid #334155; }
-        #player { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
-        .controls { width: 95%; max-width: 1000px; display: flex; gap: 10px; margin-top: 20px; }
-        input { flex: 1; padding: 12px; border-radius: 6px; background: #0f172a; color: white; border: 1px solid #334155; }
-        button { border: none; border-radius: 6px; cursor: pointer; font-weight: bold; padding: 12px 20px; transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
-        .user-card { background: #0f172a; padding: 12px; border-radius: 8px; margin-top: 10px; border: 1px solid #334155; }
-        .role-badge { font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: bold; }
+        :root {
+            --bg: #020617;
+            --card: rgba(30, 41, 59, 0.7);
+            --accent: #38bdf8;
+            --text: #f8fafc;
+            --glass: rgba(255, 255, 255, 0.05);
+            --border: rgba(255, 255, 255, 0.1);
+        }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background: radial-gradient(circle at top right, #1e1b4b, #020617);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Toast Notification */
+        #toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #ef4444;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+            opacity: 0;
+            transform: translateY(-20px);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 1000;
+        }
+        #toast.show { opacity: 1; transform: translateY(0); }
+
+        #landing-page {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--bg); display: flex; align-items: center; justify-content: center; z-index: 500;
+        }
+
+        .landing-card {
+            background: var(--card);
+            backdrop-filter: blur(12px);
+            padding: 40px;
+            border-radius: 24px;
+            border: 1px solid var(--border);
+            width: 400px;
+            text-align: center;
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
+        }
+
+        #sidebar {
+            width: 320px;
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(8px);
+            padding: 30px;
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+        }
+
+        #main { flex: 1; padding: 40px; display: flex; flex-direction: column; align-items: center; }
+
+        .video-container {
+            width: 100%;
+            max-width: 1100px;
+            aspect-ratio: 16/9;
+            background: #000;
+            border-radius: 20px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+            box-shadow: 0 0 40px rgba(56, 189, 248, 0.1);
+            position: relative;
+        }
+
+        #player { position: absolute; top:0; left:0; width: 100%; height: 100%; }
+
+        .controls {
+            width: 100%;
+            max-width: 1100px;
+            margin-top: 30px;
+            display: flex;
+            gap: 15px;
+        }
+
+        input {
+            background: var(--glass);
+            border: 1px solid var(--border);
+            color: white;
+            padding: 14px 20px;
+            border-radius: 12px;
+            outline: none;
+            transition: 0.3s;
+        }
+        input:focus { border-color: var(--accent); background: rgba(255,255,255,0.08); }
+
+        button {
+            background: var(--accent);
+            color: #020617;
+            border: none;
+            padding: 14px 28px;
+            border-radius: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        button:hover { transform: translateY(-2px); filter: brightness(1.1); box-shadow: 0 10px 15px -3px rgba(56, 189, 248, 0.3); }
+
+        .user-card {
+            background: var(--glass);
+            padding: 15px;
+            border-radius: 14px;
+            margin-bottom: 12px;
+            border: 1px solid var(--border);
+        }
+
+        .role-badge {
+            font-size: 10px; padding: 4px 8px; border-radius: 6px;
+            text-transform: uppercase; letter-spacing: 0.5px;
+        }
         .role-host { background: #fbbf24; color: #000; }
         .role-mod { background: #a855f7; color: #fff; }
     </style>
 </head>
 <body>
+
+    <div id="toast">Permission Denied: Only Host/Mods can control video.</div>
+
     <div id="landing-page">
-        <h1 style="color: var(--accent);">SyncStream</h1>
         <div class="landing-card">
-            <input type="text" id="user-name" placeholder="Enter your name">
-            <button onclick="createNewRoom()" style="background:var(--accent); color:#0f172a;">Create New Room</button>
-            <input type="text" id="room-input" placeholder="Enter Room ID">
-            <button onclick="joinExistingRoom()" style="background:#334155; color:white;">Join Room</button>
+            <h1 style="color: var(--accent); margin-bottom: 10px;">SyncStream</h1>
+            <p style="color: #94a3b8; margin-bottom: 30px;">Cinematic Watch Party Experience</p>
+            <input type="text" id="user-name" placeholder="Your Name" style="width: 80%; margin-bottom: 15px;">
+            <button onclick="createNewRoom()" style="width: 90%; margin-bottom: 10px;">Create Party</button>
+            <div style="margin: 15px 0; color: #475569;">OR</div>
+            <input type="text" id="room-input" placeholder="Room Code" style="width: 80%; margin-bottom: 15px;">
+            <button onclick="joinExistingRoom()" style="width: 90%; background: #334155; color: white;">Join Room</button>
         </div>
     </div>
+
     <div id="sidebar">
-        <h2 style="color: var(--accent);">SyncStream</h2>
-        <p id="room-display" style="font-size: 12px; color: #64748b;">Room: None</p>
-        <hr style="border: 0.5px solid #334155; width: 100%;">
-        <h4>Participants</h4>
+        <h2 style="color: var(--accent); margin-top: 0;">SyncStream</h2>
+        <div id="room-display" style="color: #64748b; font-size: 14px;">Room: --</div>
+        <hr style="border: 0.5px solid var(--border); margin: 25px 0; width: 100%;">
+        <h4 style="margin-top: 0;">Party Members</h4>
         <div id="user-list"></div>
     </div>
+
     <div id="main">
-        <div class="video-box"><div id="player"></div></div>
+        <div class="video-container">
+            <div id="player"></div>
+        </div>
         <div class="controls">
-            <input type="text" id="video-url" placeholder="Paste YouTube URL...">
-            <button id="change-video-btn" style="background:var(--accent); color:#0f172a;">Sync Video</button>
+            <input type="text" id="video-url" placeholder="Paste YouTube Link...">
+            <button id="change-video-btn">Sync Video</button>
         </div>
     </div>
+
     <script src="script.js"></script>
 </body>
 </html>
