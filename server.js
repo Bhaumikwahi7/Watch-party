@@ -15,7 +15,7 @@ io.on('connection', (socket) => {
         if (!rooms.has(roomId)) {
             rooms.set(roomId, { 
                 hostId: socket.id, 
-                currentVideoId: 'Ru4lEmhHTF4', // Default Video
+                currentVideoId: 'Ru4lEmhHTF4', 
                 currentTime: 0,
                 participants: [] 
             });
@@ -23,6 +23,8 @@ io.on('connection', (socket) => {
         const room = rooms.get(roomId);
         const role = (socket.id === room.hostId) ? 'Host' : 'Participant';
         room.participants.push({ id: socket.id, username, role });
+
+        console.log(`[SYNC] User ${username} joined room ${roomId} as ${role}`);
 
         io.to(roomId).emit('room_data', { 
             participants: room.participants, 
@@ -77,4 +79,5 @@ io.on('connection', (socket) => {
     });
 });
 
-server.listen(process.env.PORT || 3000, () => console.log("Server Live"));
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => console.log(`>>> SYNCSTREAM STUDIO ACTIVE ON PORT ${PORT}`));
